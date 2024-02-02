@@ -1,114 +1,97 @@
 import { Router } from 'express';
 import mysqlDb from '../mysqlDb';
-import {ResultSetHeader, RowDataPacket} from "mysql2";
-import {imagesUpload} from "../multer";
-import {Item, UpdateValues} from "../types";
+import { ResultSetHeader, RowDataPacket } from 'mysql2';
+import { imagesUpload } from '../multer';
+import { Item, UpdateValues } from '../types';
 
 export const itemsRouter = Router();
 
 itemsRouter.get('/', async (req, res, next) => {
   try {
-    const [results] = await mysqlDb
-      .getConnection()
-      .query(
-        'SELECT id, category_id, place_id, name FROM items',
-      );
+    const [results] = await mysqlDb.getConnection().query('SELECT id, category_id, place_id, name FROM items');
     res.send(results);
   } catch (e) {
     next(e);
   }
 });
 
-itemsRouter.get('/:id', async (req, res,next)=>{
+itemsRouter.get('/:id', async (req, res, next) => {
   try {
-    const [results] = await mysqlDb
-        .getConnection()
-        .query(
-            'SELECT i.id, i.description, i.image, i.created_at, i.name, c.name category_name, d.name place_name FROM items i ' +
-            'LEFT JOIN office.categories c on i.category_id = c.id ' +
-            'LEFT JOIN office.places d on i.place_id = d.id ' +
-            'WHERE i.id = ?',
-            [req.params.id]
-        ) as RowDataPacket[];
+    const [results] = (await mysqlDb
+      .getConnection()
+      .query(
+        'SELECT i.id, i.description, i.image, i.created_at, i.name, c.name category_name, d.name place_name FROM items i ' +
+          'LEFT JOIN office.categories c on i.category_id = c.id ' +
+          'LEFT JOIN office.places d on i.place_id = d.id ' +
+          'WHERE i.id = ?',
+        [req.params.id],
+      )) as RowDataPacket[];
     const product = results[0];
 
-    if(!product){
-      return res.status(404).send({error: 'Not found!'});
+    if (!product) {
+      return res.status(404).send({ error: 'Not found!' });
     }
-      res.send(product);
+    res.send(product);
   } catch (e) {
     next(e);
   }
-})
+});
 
 itemsRouter.post('/', imagesUpload.single('image'), async (req, res, next) => {
+  try {
+    const item: Item = {
+      categoryId: parseFloat(req.body.categoryId),
+      placeId: parseFloat(req.body.placeId),
+      name: req.body.name,
+      description: req.body.description,
+      createdAt: req.body.createdAt,
+      image: req.file ? req.file.filename : null,
+    };
 
-  try{
+    const [result] = (await mysqlDb
+      .getConnection()
+      .query(
+        'INSERT INTO items (category_id, place_id, name, description, created_at, image)' + 'VALUES (?,?,?,?,?,?)',
+        [item.categoryId, item.placeId, item.name, item.description, item.createdAt, item.image],
+      )) as ResultSetHeader[];
 
-  const item: Item = {
-    categoryId: parseFloat(req.body.categoryId),
-    placeId: parseFloat(req.body.placeId),
-    name: req.body.name,
-    description: req.body.description,
-    createdAt: req.body.createdAt,
-    image: req.file ? req.file.filename : null
+    res.send({
+      ...item,
+      id: result.insertId,
+    });
+  } catch (e) {
+    next(e);
   }
+});
 
-  const [result] = await mysqlDb.getConnection().query(
-      'INSERT INTO items (category_id, place_id, name, description, created_at, image)' +
-      'VALUES (?,?,?,?,?,?)',
-      [item.categoryId, item.placeId, item.name, item.description, item.createdAt, item.image],
-  ) as ResultSetHeader[]
-
-  res.send({
-    ...item,
-    id: result.insertId,
-  })
-  }catch (e){
-    next(e)
-  }
-
-})
-
-itemsRouter.delete('/:id', async (req,res,next)=>{
-  try{
-
-    const [isExist] = await mysqlDb.getConnection().query(
-        'SELECT id FROM items WHERE id = ?',
-        [req.params.id]
-    ) as RowDataPacket[];
+itemsRouter.delete('/:id', async (req, res, next) => {
+  try {
+    const [isExist] = (await mysqlDb
+      .getConnection()
+      .query('SELECT id FROM items WHERE id = ?', [req.params.id])) as RowDataPacket[];
 
     if (isExist.length === 0) {
-      return res.status(404).send(`There is no item with id: ${req.params.id}` );
+      return res.status(404).send(`There is no item with id: ${req.params.id}`);
     }
 
-    const [checkResult]= await mysqlDb.getConnection().query(
-        'SELECT COUNT(*) as count FROM categories WHERE id = ?', [req.params.id]
-    ) as RowDataPacket[]
-
-    if(checkResult[0].count > 0){
-      return res.status(400).send('Operation refused');
-    }
-     await mysqlDb.getConnection().query(
-      'DELETE FROM items WHERE id = ?', [req.params.id]
-  );
-  res.send(`Item with id: ${req.params.id} from table 'items' has been deleted`)
-  }catch (e){
-    next(e)
+    await mysqlDb.getConnection().query('DELETE FROM items WHERE id = ?', [req.params.id]);
+    res.send(`Item with id: ${req.params.id} from table 'items' has been deleted`);
+  } catch (e) {
+    next(e);
   }
-})
+});
 
-itemsRouter.put('/:id', imagesUpload.single('image'), async (req,res,next)=>{
+itemsRouter.put('/:id', imagesUpload.single('image'), async (req, res, next) => {
   try {
     const updateFields: string[] = [];
     const updateValues: UpdateValues[] = [];
 
-    const [isExist] = await mysqlDb.getConnection().query(
-        'SELECT id FROM items WHERE id = ?', [req.params.id]
-    ) as RowDataPacket[]
+    const [isExist] = (await mysqlDb
+      .getConnection()
+      .query('SELECT id FROM items WHERE id = ?', [req.params.id])) as RowDataPacket[];
 
-    if(isExist.length === 0){
-      return res.status(404).send(`There is no item with id: ${req.params.id}`)
+    if (isExist.length === 0) {
+      return res.status(404).send(`There is no item with id: ${req.params.id}`);
     }
 
     if (req.body.categoryId !== undefined) {
@@ -150,14 +133,12 @@ itemsRouter.put('/:id', imagesUpload.single('image'), async (req,res,next)=>{
 
     await mysqlDb.getConnection().query(updateQuery, updateParams);
 
-    const [result]=await mysqlDb.getConnection().query(
-        'SELECT * FROM items WHERE id = ?', [req.params.id]
-    ) as RowDataPacket[]
+    const [result] = (await mysqlDb
+      .getConnection()
+      .query('SELECT * FROM items WHERE id = ?', [req.params.id])) as RowDataPacket[];
 
-    res.send(result[0])
+    res.send(result[0]);
   } catch (e) {
     next(e);
   }
-
-})
-
+});

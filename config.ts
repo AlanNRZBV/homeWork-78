@@ -5,12 +5,12 @@ const rootPath = __dirname;
 const config = {
   rootPath,
   publicPath: path.join(rootPath, 'public'),
-  mysql:{
+  mysql: {
     host: 'localhost',
     user: 'root',
     password: 'Alanze1337',
-    database: 'office'
-  }
-}
+    database: 'office',
+  },
+};
 
-export default config
+export default config;
