@@ -2,7 +2,7 @@ import { Router } from 'express';
 import mysqlDb from '../mysqlDb';
 import {ResultSetHeader, RowDataPacket} from "mysql2";
 import {imagesUpload} from "../multer";
-import {ItemWithoutId, UpdateValues} from "../types";
+import {Item, UpdateValues} from "../types";
 
 export const itemsRouter = Router();
 
@@ -11,7 +11,7 @@ itemsRouter.get('/', async (req, res, next) => {
     const [results] = await mysqlDb
       .getConnection()
       .query(
-        'SELECT i.id, i.description, i.image, i.created_at, i.name, c.name category_name, d.name place_name FROM items i LEFT JOIN office.categories c on i.category_id = c.id LEFT JOIN office.places d on i.place_id = d.id',
+        'SELECT id, category_id, place_id, name FROM items',
       );
     res.send(results);
   } catch (e) {
@@ -41,9 +41,11 @@ itemsRouter.get('/:id', async (req, res,next)=>{
   }
 })
 
-itemsRouter.post('/', imagesUpload.single('image'), async (req, res) => {
+itemsRouter.post('/', imagesUpload.single('image'), async (req, res, next) => {
 
-  const item: ItemWithoutId = {
+  try{
+
+  const item: Item = {
     categoryId: parseFloat(req.body.categoryId),
     placeId: parseFloat(req.body.placeId),
     name: req.body.name,
@@ -62,17 +64,21 @@ itemsRouter.post('/', imagesUpload.single('image'), async (req, res) => {
     ...item,
     id: result.insertId,
   })
+  }catch (e){
+    next(e)
+  }
+
 })
 
 itemsRouter.delete('/:id', async (req,res,next)=>{
   try{
 
-    const [checkExistResult] = await mysqlDb.getConnection().query(
+    const [isExist] = await mysqlDb.getConnection().query(
         'SELECT id FROM items WHERE id = ?',
         [req.params.id]
     ) as RowDataPacket[];
 
-    if (checkExistResult.length === 0) {
+    if (isExist.length === 0) {
       return res.status(404).send(`There is no item with id: ${req.params.id}` );
     }
 
@@ -136,7 +142,7 @@ itemsRouter.put('/:id', imagesUpload.single('image'), async (req,res,next)=>{
     }
 
     if (updateFields.length === 0) {
-      return res.status(400).send('No valid fields provided for update');
+      return res.status(400).send('No values for update');
     }
 
     const updateQuery = `UPDATE items SET ${updateFields.join(', ')} WHERE id = ?`;
@@ -147,7 +153,7 @@ itemsRouter.put('/:id', imagesUpload.single('image'), async (req,res,next)=>{
     const [result]=await mysqlDb.getConnection().query(
         'SELECT * FROM items WHERE id = ?', [req.params.id]
     ) as RowDataPacket[]
-    
+
     res.send(result[0])
   } catch (e) {
     next(e);
