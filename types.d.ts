@@ -1,5 +1,4 @@
 export interface ItemWithoutId {
-  id: number,
   categoryId: number,
   placeId: number,
   name: string,
@@ -7,3 +6,5 @@ export interface ItemWithoutId {
   createdAt: string,
   image: string | null
 }
+
+export type UpdateValues = number | string | null | File
